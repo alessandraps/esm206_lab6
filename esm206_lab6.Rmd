@@ -7,24 +7,124 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(palmerpenguins)
+library(broom)
+library(equatiomatic)
 ```
 
-## R Markdown
+## Ranked based test example
+- Mann-Whitney U (non-parametric alternative to an unpaired 2-sample t-test).
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+H0: Equal ranks (medians) 
+HA: Ranks are not equal (medians are not equal)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+### Create our mock samples
 
-```{r cars}
-summary(cars)
+`set.seed()` to create "pseudorandom, but reproducible samples"
+
+```{r}
+set.seed(1414)
+gp_1 <- sample.int(20, size = 15, replace = TRUE) # Creating our samples
+
+set.seed(1424)
+gp_2 <- sample.int(30, size =15, replace = TRUE) # Creating our samples
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+Tkae a quick look at the distributions using `hist()`
+```{r}
+hist(gp_1) # exploratory visualization
+hist(gp_2) #exploratory visualization
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+Try a t-test so that we can compare the results
+```{r}
+ttest <- t.test(gp_1, gp_2)
+
+# If these data were paired, I can just add the argument `paired = TRUE` within the t.test() function.
+
+```
+
+This p-value means that IF our samples are drawn from populations with the same mean (i.e., if the null hypothesis is true), there is `r round(ttest$p.value, 2)` probability (chance) of finding sample means *at least as different* as mine by random chance. 
+
+It is pretty likely because it is above 0.05, so we fail to reject the H0. AKA there is no significant difference.
+
+[A more comprehensive explanation of difference between groups... actually means, data spread, effect size].. there is no significant difference (t(df) = t-statistic value, p = ). 
+
+### Man Whitney U rank based test
+
+We use the `wilcox.test()` function to perform a two-sample rank-based test
+```{r}
+mwu <- wilcox.test(gp_1, gp_2)
+```
+
+This p-value means that IF our samples are drawn from populations with the same median, there is a (28%) `r mwu$p.value` probability of finding sample medians at least as different as mine by random chance.
+
+We do not have enough evidence to reject our H0, so we fail to reject. 
+
+There is no significant difference in medians (Mann-Whitney U; U = `r mwu$statistic`, p-value = `r round(mwu$p.value, 2)`).
+
+The medians of group A (M = 22.4 g) and group B (M= 31.2 g) did not differ significantly (Mann Whitney U, ...). 
+
+## Simple linear regression 
+
+Two *continuous quantitative* variables that you are trying to understand the relationship between, and you think that a linear relationship makes sense. 
+
+Use the `penguins` data from {palmerpenguins}, exploring flipper length (x) versus body mass (y).
+```{r}
+# Use view(penguins) to look at it 
+# Make an exploratory scatterplot of penguin flipper length (x) versus body mass (y)
+# Once plotted, ask yourself whether a linear relationship makes sense as a way to describe this relationship.
+
+ggplot(data = penguins, aes(x = flipper_length_mm,
+                            y = body_mass_g)) +
+         geom_point() +
+  geom_smooth(method = "lm") 
+```
+### Find the model estimates (coefficients)
+
+Use the `lm()` function for linear model.
+
+body_mass_g ~ <<<< tilde (not minus sign)
+```{r}
+penguin_lm <- lm(body_mass_g ~ flipper_length_mm, data = penguins)
+# View it in console
+# what does it mean? that bodymass (G) = 49.69(FLIPPERLENGTH) - 5780.83
+# What must be the units of the 49.69 coefficient for this equation to make sense? The final units for the right side has to be grams.
+# 49.69 is that on average, we expect a 1 mm increase on flipper length for every 49.69 increase in body mass grams
+# -5780.83 units? grams
+# How do you interpret "-5780.83" and why is not valuable at all? that is the mass of the penguin with no flippers. That is the expected average mass of a penguin with flipper length of zero. when the x-axis variable = 0. 
+```
+
+Refer anything from the summary to an inline code chunk:
+Model coefficients: `r penguin_lm$coefficients`
+Flipper length coefficient: `r penguin_lm$coefficients[2]` # isolating one of them
+
+### Use `brom::tidy()` to get a tidy ouput from lm()
+```{r}
+penguin_lm_tidy <- tidy(penguin_lm)
+
+penguin_lm_tidy
+```
+
+
+### Use broom::glance() to get output of model fit and statistical data.
+```{r}
+penguin_lm_glance <- glance(penguin_lm)
+
+penguin_lm_glance
+```
+
+### Use equationmatic::extract_eq() to return the model in LaTex
+LaText is great to write mathematical equations in code.
+```{r}
+extract_eq(model = penguin_lm, use_coefs = TRUE) # This includes your values into that expression
+```
+
+### Use plot() function to automatically produce diagnostic plots 
+```{r}
+plot(penguin_lm) # homoscedasticity vs heteroscedasity, residual spread
+```
+
